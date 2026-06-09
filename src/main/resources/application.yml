@@ -20,3 +20,13 @@ info:
 logging:
   level:
     org.apache.camel: INFO
+
+integration:
+  sftp:
+    enabled: false
+    host: localhost
+    port: 2222
+    username: camel
+    password: camel
+    directory: upload
+    poll-delay: 5000

@@ -3,6 +3,7 @@ package nl.itqaanconsulting.integrationhub.order.api;
 import jakarta.validation.Valid;
 import nl.itqaanconsulting.integrationhub.order.domain.CanonicalOrder;
 import nl.itqaanconsulting.integrationhub.order.persistence.InMemoryOrderStore;
+import nl.itqaanconsulting.integrationhub.order.persistence.InMemoryFileImportStore;
 import org.apache.camel.ProducerTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -20,10 +21,16 @@ public class OrderImportController {
 
     private final ProducerTemplate producerTemplate;
     private final InMemoryOrderStore orderStore;
+    private final InMemoryFileImportStore fileImportStore;
 
-    public OrderImportController(ProducerTemplate producerTemplate, InMemoryOrderStore orderStore) {
+    public OrderImportController(
+            ProducerTemplate producerTemplate,
+            InMemoryOrderStore orderStore,
+            InMemoryFileImportStore fileImportStore
+    ) {
         this.producerTemplate = producerTemplate;
         this.orderStore = orderStore;
+        this.fileImportStore = fileImportStore;
     }
 
     @PostMapping
@@ -49,5 +56,12 @@ public class OrderImportController {
     @GetMapping("/summary")
     public IntegrationSummaryResponse summary() {
         return new IntegrationSummaryResponse(orderStore.size(), orderStore.countByLane());
+    }
+
+    @GetMapping("/file-imports")
+    public List<FileImportResponse> findFileImports() {
+        return fileImportStore.findAll().stream()
+                .map(FileImportResponse::from)
+                .toList();
     }
 }

@@ -41,6 +41,23 @@ public class OrderImportRoute extends RouteBuilder {
                 .unmarshal(csvDataFormat)
                 .bean("csvOrderBatchProcessor", "process");
 
+        from("direct:import-order-file")
+                .routeId("order-file-processing-route")
+                .convertBodyTo(String.class)
+                .to("direct:import-order-csv")
+                .bean("fileImportRecorder", "record");
+
+        from("sftp://{{integration.sftp.username}}@{{integration.sftp.host}}:{{integration.sftp.port}}/{{integration.sftp.directory}}"
+                + "?password={{integration.sftp.password}}"
+                + "&include=.*\\.csv"
+                + "&delay={{integration.sftp.poll-delay}}"
+                + "&readLock=changed"
+                + "&move=.processed/${file:name}"
+                + "&bridgeErrorHandler=true")
+                .routeId("sftp-order-file-route")
+                .autoStartup("{{integration.sftp.enabled}}")
+                .to("direct:import-order-file");
+
         from("direct:store-order")
                 .routeId("store-canonical-order")
                 .process(exchange -> orderStore.save(exchange.getMessage().getBody(CanonicalOrder.class)));

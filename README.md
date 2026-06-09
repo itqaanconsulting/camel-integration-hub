@@ -2,7 +2,7 @@
 
 Integration showcase built with Java 21, Spring Boot and Apache Camel.
 
-The hub accepts individual JSON orders and CSV batches, normalizes them to one canonical model and uses a Camel content-based router to assign a standard or high-value processing lane.
+The hub accepts individual JSON orders and CSV batches, and can poll CSV files from SFTP. Every input is normalized to one canonical model and uses a Camel content-based router to assign a standard or high-value processing lane.
 
 ## Current Flow
 
@@ -61,6 +61,28 @@ CSV-1003,marketplace,third@example.com,1750.00,USD
 
 The response contains accepted and rejected counts, imported canonical orders and a reason for every rejected row.
 
+## SFTP Pickup
+
+The SFTP consumer is disabled by default so the application can run without external infrastructure. Configure the connection through `integration.sftp.*` and enable it with:
+
+```powershell
+mvn spring-boot:run -Dspring-boot.run.profiles=sftp
+```
+
+The route:
+
+1. Polls `*.csv` files from the configured upload directory.
+2. Uses a changed-file read lock to avoid partially written files.
+3. Sends the content through the existing CSV and canonical order routes.
+4. Moves processed files into `.processed`.
+5. Records the filename and accepted/rejected totals.
+
+Inspect processed file imports:
+
+```http
+GET /api/integrations/orders/file-imports
+```
+
 ## Test
 
 ```powershell
@@ -69,7 +91,6 @@ mvn test
 
 ## Planned Showcase Flows
 
-- SFTP file pickup
 - JSON and XML transformation
 - External API delivery with WireMock
 - Dead-letter handling and redelivery

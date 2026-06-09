@@ -1,7 +1,10 @@
 package nl.itqaanconsulting.integrationhub.order;
 
 import nl.itqaanconsulting.integrationhub.order.persistence.InMemoryOrderStore;
+import nl.itqaanconsulting.integrationhub.order.persistence.InMemoryFileImportStore;
+import org.apache.camel.Exchange;
 import org.apache.camel.CamelContext;
+import org.apache.camel.ProducerTemplate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,17 +30,26 @@ class OrderImportIntegrationTest {
     private CamelContext camelContext;
 
     @Autowired
+    private ProducerTemplate producerTemplate;
+
+    @Autowired
     private InMemoryOrderStore orderStore;
+
+    @Autowired
+    private InMemoryFileImportStore fileImportStore;
 
     @BeforeEach
     void clearStore() {
         orderStore.clear();
+        fileImportStore.clear();
     }
 
     @Test
     void startsCamelRoutes() {
         assertThat(camelContext.getRouteController().getRouteStatus("order-import-route").isStarted()).isTrue();
         assertThat(camelContext.getRouteController().getRouteStatus("csv-order-import-route").isStarted()).isTrue();
+        assertThat(camelContext.getRouteController().getRouteStatus("order-file-processing-route").isStarted()).isTrue();
+        assertThat(camelContext.getRouteController().getRouteStatus("sftp-order-file-route").isStopped()).isTrue();
         assertThat(camelContext.getRouteController().getRouteStatus("store-canonical-order").isStarted()).isTrue();
     }
 
@@ -101,6 +113,28 @@ class OrderImportIntegrationTest {
                 .andExpect(jsonPath("$.totalOrders").value(2))
                 .andExpect(jsonPath("$.ordersByLane.STANDARD").value(1))
                 .andExpect(jsonPath("$.ordersByLane.HIGH_VALUE").value(1));
+    }
+
+    @Test
+    void processesPickedUpFileAndRecordsImportResult() throws Exception {
+        String csv = """
+                externalOrderId,sourceSystem,customerEmail,totalAmount,currency
+                FILE-1001,sftp-partner,partner@example.com,450.00,EUR
+                """;
+
+        producerTemplate.requestBodyAndHeader(
+                "direct:import-order-file",
+                csv,
+                Exchange.FILE_NAME_ONLY,
+                "partner-orders.csv"
+        );
+
+        mockMvc.perform(get("/api/integrations/orders/file-imports"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].fileName").value("partner-orders.csv"))
+                .andExpect(jsonPath("$[0].totalRows").value(1))
+                .andExpect(jsonPath("$[0].acceptedRows").value(1))
+                .andExpect(jsonPath("$[0].rejectedRows").value(0));
     }
 
     private String orderJson(String sourceSystem, String email, String amount, String currency) {
