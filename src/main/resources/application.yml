@@ -22,6 +22,9 @@ logging:
     org.apache.camel: INFO
 
 integration:
+  delivery:
+    maximum-redeliveries: ${DELIVERY_MAXIMUM_REDELIVERIES:2}
+    redelivery-delay: ${DELIVERY_REDELIVERY_DELAY:100}
   sftp:
     enabled: false
     host: ${SFTP_HOST:localhost}

@@ -2,6 +2,7 @@ package nl.itqaanconsulting.integrationhub.order;
 
 import nl.itqaanconsulting.integrationhub.order.persistence.InMemoryOrderStore;
 import nl.itqaanconsulting.integrationhub.order.persistence.InMemoryFileImportStore;
+import nl.itqaanconsulting.integrationhub.order.persistence.InMemoryOrderDeliveryStore;
 import org.apache.camel.Exchange;
 import org.apache.camel.CamelContext;
 import org.apache.camel.ProducerTemplate;
@@ -38,10 +39,14 @@ class OrderImportIntegrationTest {
     @Autowired
     private InMemoryFileImportStore fileImportStore;
 
+    @Autowired
+    private InMemoryOrderDeliveryStore deliveryStore;
+
     @BeforeEach
     void clearStore() {
         orderStore.clear();
         fileImportStore.clear();
+        deliveryStore.clear();
     }
 
     @Test
@@ -51,6 +56,7 @@ class OrderImportIntegrationTest {
         assertThat(camelContext.getRouteController().getRouteStatus("order-file-processing-route").isStarted()).isTrue();
         assertThat(camelContext.getRouteController().getRouteStatus("sftp-order-file-route").isStopped()).isTrue();
         assertThat(camelContext.getRouteController().getRouteStatus("store-canonical-order").isStarted()).isTrue();
+        assertThat(camelContext.getRouteController().getRouteStatus("deliver-order-route").isStarted()).isTrue();
     }
 
     @Test
@@ -63,6 +69,27 @@ class OrderImportIntegrationTest {
                 .andExpect(jsonPath("$.customerEmail").value("customer@example.com"))
                 .andExpect(jsonPath("$.currency").value("EUR"))
                 .andExpect(jsonPath("$.processingLane").value("STANDARD"));
+
+        mockMvc.perform(get("/api/integrations/orders/deliveries"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].status").value("DELIVERED"))
+                .andExpect(jsonPath("$[0].attempts").value(1));
+    }
+
+    @Test
+    void retriesFailedDeliveryAndMovesItToDeadLetterStore() throws Exception {
+        mockMvc.perform(post("/api/integrations/orders")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(orderJson("demo-unavailable", "failure@example.com", "249.00", "EUR")))
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.sourceSystem").value("DEMO-UNAVAILABLE"));
+
+        mockMvc.perform(get("/api/integrations/orders/dead-letters"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].externalOrderId").value("EXT-1001"))
+                .andExpect(jsonPath("$[0].status").value("DEAD_LETTER"))
+                .andExpect(jsonPath("$[0].attempts").value(3))
+                .andExpect(jsonPath("$[0].errorMessage").value("Demo downstream service is unavailable"));
     }
 
     @Test

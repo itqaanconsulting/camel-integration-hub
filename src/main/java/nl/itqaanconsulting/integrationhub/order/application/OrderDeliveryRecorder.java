@@ -1,0 +1,45 @@
+package nl.itqaanconsulting.integrationhub.order.application;
+
+import nl.itqaanconsulting.integrationhub.order.domain.CanonicalOrder;
+import nl.itqaanconsulting.integrationhub.order.domain.OrderDelivery;
+import nl.itqaanconsulting.integrationhub.order.persistence.InMemoryOrderDeliveryStore;
+import org.apache.camel.Exchange;
+import org.springframework.stereotype.Component;
+
+import java.time.Instant;
+
+@Component
+public class OrderDeliveryRecorder {
+
+    private final InMemoryOrderDeliveryStore deliveryStore;
+
+    public OrderDeliveryRecorder(InMemoryOrderDeliveryStore deliveryStore) {
+        this.deliveryStore = deliveryStore;
+    }
+
+    public void recordDelivered(Exchange exchange) {
+        save(exchange, "DELIVERED", null);
+    }
+
+    public void recordDeadLetter(Exchange exchange) {
+        Exception exception = exchange.getProperty(Exchange.EXCEPTION_CAUGHT, Exception.class);
+        save(exchange, "DEAD_LETTER", exception == null ? "Delivery failed" : exception.getMessage());
+    }
+
+    private void save(Exchange exchange, String status, String errorMessage) {
+        CanonicalOrder order = exchange.getMessage().getBody(CanonicalOrder.class);
+        Integer attempts = exchange.getMessage().getHeader(
+                DemoOrderDeliveryGateway.DELIVERY_ATTEMPTS_HEADER,
+                Integer.class
+        );
+
+        deliveryStore.save(new OrderDelivery(
+                order.integrationId(),
+                order.externalOrderId(),
+                status,
+                attempts == null ? 1 : attempts,
+                errorMessage,
+                Instant.now()
+        ));
+    }
+}

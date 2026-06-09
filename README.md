@@ -45,7 +45,37 @@ Inspect results:
 ```http
 GET /api/integrations/orders
 GET /api/integrations/orders/summary
+GET /api/integrations/orders/deliveries
 ```
+
+After an order is stored, Camel sends it to a demo downstream adapter. Successful deliveries are recorded with status `DELIVERED`.
+
+## Retry And Dead Letters
+
+The delivery route uses exponential backoff. A failed downstream call is retried twice, resulting in three delivery attempts. When all attempts fail, the order remains accepted and is recorded with status `DEAD_LETTER`.
+
+Use source system `demo-unavailable` to demonstrate this scenario:
+
+```http
+POST /api/integrations/orders
+Content-Type: application/json
+
+{
+  "externalOrderId": "FAIL-1001",
+  "sourceSystem": "demo-unavailable",
+  "customerEmail": "failure@example.com",
+  "totalAmount": 249.00,
+  "currency": "EUR"
+}
+```
+
+Inspect the delivery result:
+
+```http
+GET /api/integrations/orders/dead-letters
+```
+
+The response shows status `DEAD_LETTER`, three attempts and the final error message. Retry settings can be overridden with `DELIVERY_MAXIMUM_REDELIVERIES` and `DELIVERY_REDELIVERY_DELAY`.
 
 Import a CSV batch:
 
@@ -106,5 +136,4 @@ mvn test
 
 - JSON and XML transformation
 - External API delivery with WireMock
-- Dead-letter handling and redelivery
 - Route metrics and browser demo

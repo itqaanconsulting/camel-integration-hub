@@ -1,5 +1,6 @@
 package nl.itqaanconsulting.integrationhub.order.messaging;
 
+import nl.itqaanconsulting.integrationhub.order.application.DownstreamDeliveryException;
 import nl.itqaanconsulting.integrationhub.order.domain.CanonicalOrder;
 import nl.itqaanconsulting.integrationhub.order.persistence.InMemoryOrderStore;
 import org.apache.camel.builder.RouteBuilder;
@@ -20,6 +21,14 @@ public class OrderImportRoute extends RouteBuilder {
 
     @Override
     public void configure() {
+        onException(DownstreamDeliveryException.class)
+                .maximumRedeliveries("{{integration.delivery.maximum-redeliveries}}")
+                .redeliveryDelay("{{integration.delivery.redelivery-delay}}")
+                .useExponentialBackOff()
+                .backOffMultiplier(2)
+                .handled(true)
+                .bean("orderDeliveryRecorder", "recordDeadLetter");
+
         CsvDataFormat csvDataFormat = new CsvDataFormat();
         csvDataFormat.setUseMaps(true);
         csvDataFormat.setSkipHeaderRecord(true);
@@ -62,6 +71,12 @@ public class OrderImportRoute extends RouteBuilder {
 
         from("direct:store-order")
                 .routeId("store-canonical-order")
-                .process(exchange -> orderStore.save(exchange.getMessage().getBody(CanonicalOrder.class)));
+                .process(exchange -> orderStore.save(exchange.getMessage().getBody(CanonicalOrder.class)))
+                .to("direct:deliver-order");
+
+        from("direct:deliver-order")
+                .routeId("deliver-order-route")
+                .bean("demoOrderDeliveryGateway", "deliver")
+                .bean("orderDeliveryRecorder", "recordDelivered");
     }
 }

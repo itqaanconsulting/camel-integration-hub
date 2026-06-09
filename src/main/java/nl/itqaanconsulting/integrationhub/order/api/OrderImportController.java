@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 import nl.itqaanconsulting.integrationhub.order.domain.CanonicalOrder;
 import nl.itqaanconsulting.integrationhub.order.persistence.InMemoryOrderStore;
 import nl.itqaanconsulting.integrationhub.order.persistence.InMemoryFileImportStore;
+import nl.itqaanconsulting.integrationhub.order.persistence.InMemoryOrderDeliveryStore;
 import org.apache.camel.ProducerTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -22,15 +23,18 @@ public class OrderImportController {
     private final ProducerTemplate producerTemplate;
     private final InMemoryOrderStore orderStore;
     private final InMemoryFileImportStore fileImportStore;
+    private final InMemoryOrderDeliveryStore deliveryStore;
 
     public OrderImportController(
             ProducerTemplate producerTemplate,
             InMemoryOrderStore orderStore,
-            InMemoryFileImportStore fileImportStore
+            InMemoryFileImportStore fileImportStore,
+            InMemoryOrderDeliveryStore deliveryStore
     ) {
         this.producerTemplate = producerTemplate;
         this.orderStore = orderStore;
         this.fileImportStore = fileImportStore;
+        this.deliveryStore = deliveryStore;
     }
 
     @PostMapping
@@ -62,6 +66,20 @@ public class OrderImportController {
     public List<FileImportResponse> findFileImports() {
         return fileImportStore.findAll().stream()
                 .map(FileImportResponse::from)
+                .toList();
+    }
+
+    @GetMapping("/deliveries")
+    public List<OrderDeliveryResponse> findDeliveries() {
+        return deliveryStore.findAll().stream()
+                .map(OrderDeliveryResponse::from)
+                .toList();
+    }
+
+    @GetMapping("/dead-letters")
+    public List<OrderDeliveryResponse> findDeadLetters() {
+        return deliveryStore.findDeadLetters().stream()
+                .map(OrderDeliveryResponse::from)
                 .toList();
     }
 }
