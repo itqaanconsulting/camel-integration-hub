@@ -5,6 +5,11 @@ spring:
   application:
     name: camel-integration-hub
 
+camel:
+  dataformat:
+    jackson:
+      auto-discover-object-mapper: true
+
 management:
   endpoints:
     web:
@@ -23,6 +28,7 @@ logging:
 
 integration:
   delivery:
+    url: ${DELIVERY_URL:http://localhost:8090/api/orders}
     maximum-redeliveries: ${DELIVERY_MAXIMUM_REDELIVERIES:2}
     redelivery-delay: ${DELIVERY_REDELIVERY_DELAY:100}
   sftp:

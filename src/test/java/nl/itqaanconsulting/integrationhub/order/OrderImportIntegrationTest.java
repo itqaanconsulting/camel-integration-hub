@@ -1,5 +1,6 @@
 package nl.itqaanconsulting.integrationhub.order;
 
+import com.github.tomakehurst.wiremock.WireMockServer;
 import nl.itqaanconsulting.integrationhub.order.persistence.InMemoryOrderStore;
 import nl.itqaanconsulting.integrationhub.order.persistence.InMemoryFileImportStore;
 import nl.itqaanconsulting.integrationhub.order.persistence.InMemoryOrderDeliveryStore;
@@ -7,14 +8,20 @@ import org.apache.camel.Exchange;
 import org.apache.camel.CamelContext;
 import org.apache.camel.ProducerTemplate;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static com.github.tomakehurst.wiremock.client.WireMock.*;
+import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig;
+import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -23,6 +30,17 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 class OrderImportIntegrationTest {
+
+    private static final WireMockServer DOWNSTREAM_API = new WireMockServer(wireMockConfig().dynamicPort());
+
+    static {
+        DOWNSTREAM_API.start();
+    }
+
+    @DynamicPropertySource
+    static void deliveryProperties(DynamicPropertyRegistry registry) {
+        registry.add("integration.delivery.url", () -> DOWNSTREAM_API.baseUrl() + "/api/orders");
+    }
 
     @Autowired
     private MockMvc mockMvc;
@@ -44,9 +62,25 @@ class OrderImportIntegrationTest {
 
     @BeforeEach
     void clearStore() {
+        DOWNSTREAM_API.resetAll();
+        DOWNSTREAM_API.stubFor(com.github.tomakehurst.wiremock.client.WireMock.post(urlEqualTo("/api/orders"))
+                .atPriority(10)
+                .willReturn(aResponse().withStatus(202)));
+        DOWNSTREAM_API.stubFor(com.github.tomakehurst.wiremock.client.WireMock.post(urlEqualTo("/api/orders"))
+                .atPriority(1)
+                .withRequestBody(matchingJsonPath("$.sourceSystem", equalTo("DEMO-UNAVAILABLE")))
+                .willReturn(aResponse()
+                        .withStatus(500)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("{\"message\":\"Downstream service is unavailable\"}")));
         orderStore.clear();
         fileImportStore.clear();
         deliveryStore.clear();
+    }
+
+    @AfterAll
+    static void stopDownstreamApi() {
+        DOWNSTREAM_API.stop();
     }
 
     @Test
@@ -74,6 +108,10 @@ class OrderImportIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].status").value("DELIVERED"))
                 .andExpect(jsonPath("$[0].attempts").value(1));
+
+        DOWNSTREAM_API.verify(1, postRequestedFor(urlEqualTo("/api/orders"))
+                .withHeader("Content-Type", containing("application/json"))
+                .withRequestBody(matchingJsonPath("$.processingLane", equalTo("STANDARD"))));
     }
 
     @Test
@@ -89,7 +127,10 @@ class OrderImportIntegrationTest {
                 .andExpect(jsonPath("$[0].externalOrderId").value("EXT-1001"))
                 .andExpect(jsonPath("$[0].status").value("DEAD_LETTER"))
                 .andExpect(jsonPath("$[0].attempts").value(3))
-                .andExpect(jsonPath("$[0].errorMessage").value("Demo downstream service is unavailable"));
+                .andExpect(jsonPath("$[0].errorMessage").value(containsString("statusCode: 500")));
+
+        DOWNSTREAM_API.verify(3, postRequestedFor(urlEqualTo("/api/orders"))
+                .withRequestBody(matchingJsonPath("$.sourceSystem", equalTo("DEMO-UNAVAILABLE"))));
     }
 
     @Test

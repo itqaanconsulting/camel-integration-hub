@@ -11,6 +11,8 @@ import java.time.Instant;
 @Component
 public class OrderDeliveryRecorder {
 
+    public static final String DELIVERY_ATTEMPTS_PROPERTY = "deliveryAttempts";
+
     private final InMemoryOrderDeliveryStore deliveryStore;
 
     public OrderDeliveryRecorder(InMemoryOrderDeliveryStore deliveryStore) {
@@ -27,11 +29,8 @@ public class OrderDeliveryRecorder {
     }
 
     private void save(Exchange exchange, String status, String errorMessage) {
-        CanonicalOrder order = exchange.getMessage().getBody(CanonicalOrder.class);
-        Integer attempts = exchange.getMessage().getHeader(
-                DemoOrderDeliveryGateway.DELIVERY_ATTEMPTS_HEADER,
-                Integer.class
-        );
+        CanonicalOrder order = exchange.getProperty("deliveryOrder", CanonicalOrder.class);
+        Integer attempts = exchange.getProperty(DELIVERY_ATTEMPTS_PROPERTY, Integer.class);
 
         deliveryStore.save(new OrderDelivery(
                 order.integrationId(),

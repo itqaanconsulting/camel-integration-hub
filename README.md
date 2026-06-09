@@ -13,6 +13,9 @@ REST request
     -> canonical model mapping
     -> content-based routing
     -> in-memory order store
+    -> JSON serialization
+    -> external HTTP API
+    -> delivery or dead-letter registration
 ```
 
 CSV batches use Camel CSV unmarshalling. Each valid row enters the same canonical order route as a JSON request, while invalid rows are returned in a reject report.
@@ -48,13 +51,15 @@ GET /api/integrations/orders/summary
 GET /api/integrations/orders/deliveries
 ```
 
-After an order is stored, Camel sends it to a demo downstream adapter. Successful deliveries are recorded with status `DELIVERED`.
+After an order is stored, Camel serializes the canonical model to JSON and sends an HTTP POST to the configured downstream API. Successful deliveries are recorded with status `DELIVERED`.
+
+The downstream URL defaults to `http://localhost:8090/api/orders` and can be overridden with `DELIVERY_URL`.
 
 ## Retry And Dead Letters
 
-The delivery route uses exponential backoff. A failed downstream call is retried twice, resulting in three delivery attempts. When all attempts fail, the order remains accepted and is recorded with status `DEAD_LETTER`.
+The delivery route uses exponential backoff. An HTTP error response is retried twice, resulting in three delivery attempts. When all attempts fail, the order remains accepted and is recorded with status `DEAD_LETTER`.
 
-Use source system `demo-unavailable` to demonstrate this scenario:
+The integration tests use WireMock as the downstream API. Requests for source system `DEMO-UNAVAILABLE` receive HTTP 500, while other requests receive HTTP 202:
 
 ```http
 POST /api/integrations/orders
@@ -75,7 +80,7 @@ Inspect the delivery result:
 GET /api/integrations/orders/dead-letters
 ```
 
-The response shows status `DEAD_LETTER`, three attempts and the final error message. Retry settings can be overridden with `DELIVERY_MAXIMUM_REDELIVERIES` and `DELIVERY_REDELIVERY_DELAY`.
+The response shows status `DEAD_LETTER`, three attempts and the final HTTP error. Retry settings can be overridden with `DELIVERY_MAXIMUM_REDELIVERIES` and `DELIVERY_REDELIVERY_DELAY`.
 
 Import a CSV batch:
 
@@ -132,8 +137,9 @@ The local demo disables strict host-key checking because the disposable containe
 mvn test
 ```
 
+WireMock starts on a random port during the integration test. The tests verify the JSON request body, successful delivery and all three HTTP attempts for a failed delivery.
+
 ## Planned Showcase Flows
 
 - JSON and XML transformation
-- External API delivery with WireMock
 - Route metrics and browser demo
