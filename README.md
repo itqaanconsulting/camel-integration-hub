@@ -66,7 +66,8 @@ The response contains accepted and rejected counts, imported canonical orders an
 The SFTP consumer is disabled by default so the application can run without external infrastructure. Configure the connection through `integration.sftp.*` and enable it with:
 
 ```powershell
-mvn spring-boot:run -Dspring-boot.run.profiles=sftp
+docker compose up -d
+mvn spring-boot:run "-Dspring-boot.run.profiles=sftp"
 ```
 
 The route:
@@ -82,6 +83,18 @@ Inspect processed file imports:
 ```http
 GET /api/integrations/orders/file-imports
 ```
+
+Upload the included demo batch:
+
+```powershell
+docker cp demo/sftp-orders.csv camel-integration-sftp:/home/camel/upload/orders.csv
+```
+
+Within a few seconds Camel picks up the file. The demo batch contains two valid orders and one rejected row. The source file is moved to the `.processed` directory on the SFTP server.
+
+Connection settings can be overridden with `SFTP_HOST`, `SFTP_PORT`, `SFTP_USERNAME`, `SFTP_PASSWORD`, `SFTP_DIRECTORY` and `SFTP_POLL_DELAY`.
+
+The local demo disables strict host-key checking because the disposable container generates its own key. For a real environment, set `SFTP_STRICT_HOST_KEY_CHECKING=yes` and `SFTP_USE_USER_KNOWN_HOSTS_FILE=true`, and provision the server key in the runtime user's `known_hosts` file.
 
 ## Test
 

@@ -53,6 +53,8 @@ public class OrderImportRoute extends RouteBuilder {
                 + "&delay={{integration.sftp.poll-delay}}"
                 + "&readLock=changed"
                 + "&move=.processed/${file:name}"
+                + "&strictHostKeyChecking={{integration.sftp.strict-host-key-checking}}"
+                + "&useUserKnownHostsFile={{integration.sftp.use-user-known-hosts-file}}"
                 + "&bridgeErrorHandler=true")
                 .routeId("sftp-order-file-route")
                 .autoStartup("{{integration.sftp.enabled}}")

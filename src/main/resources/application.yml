@@ -24,9 +24,11 @@ logging:
 integration:
   sftp:
     enabled: false
-    host: localhost
-    port: 2222
-    username: camel
-    password: camel
-    directory: upload
-    poll-delay: 5000
+    host: ${SFTP_HOST:localhost}
+    port: ${SFTP_PORT:2222}
+    username: ${SFTP_USERNAME:camel}
+    password: ${SFTP_PASSWORD:camel}
+    directory: ${SFTP_DIRECTORY:upload}
+    poll-delay: ${SFTP_POLL_DELAY:5000}
+    strict-host-key-checking: ${SFTP_STRICT_HOST_KEY_CHECKING:no}
+    use-user-known-hosts-file: ${SFTP_USE_USER_KNOWN_HOSTS_FILE:false}

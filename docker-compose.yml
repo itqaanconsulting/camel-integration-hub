@@ -1,0 +1,7 @@
+services:
+  sftp:
+    image: atmoz/sftp@sha256:db00e1e6065936ee33d8806b6962b71b715eea7feb758b8d6de927b1607fba55
+    container_name: camel-integration-sftp
+    command: camel:camel:::upload
+    ports:
+      - "2222:22"

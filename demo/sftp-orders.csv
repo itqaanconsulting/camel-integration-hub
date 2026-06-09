@@ -1,0 +1,4 @@
+externalOrderId,sourceSystem,customerEmail,totalAmount,currency
+SFTP-1001,partner-a,first@example.com,275.50,EUR
+SFTP-1002,partner-a,invalid-email,450.00,EUR
+SFTP-1003,partner-b,priority@example.com,1850.00,USD
