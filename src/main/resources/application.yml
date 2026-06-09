@@ -1,0 +1,22 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: camel-integration-hub
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+info:
+  app:
+    name: Camel Integration Hub
+    version: 0.1.0-SNAPSHOT
+    description: Apache Camel integration patterns showcase.
+
+logging:
+  level:
+    org.apache.camel: INFO
