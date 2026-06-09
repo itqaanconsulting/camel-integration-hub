@@ -35,7 +35,7 @@ logging:
 
 integration:
   delivery:
-    url: ${DELIVERY_URL:http://localhost:8090/api/orders}
+    url: ${DELIVERY_URL:http://localhost:${server.port}/api/demo/downstream/orders}
     maximum-redeliveries: ${DELIVERY_MAXIMUM_REDELIVERIES:2}
     redelivery-delay: ${DELIVERY_REDELIVERY_DELAY:100}
   sftp:

@@ -28,6 +28,8 @@ mvn spring-boot:run
 
 The application runs on `http://localhost:8083`.
 
+Open `http://localhost:8083` for the browser demo. It can submit successful orders, trigger the retry/dead-letter scenario and inspect route and delivery status without additional infrastructure.
+
 Import an order:
 
 ```http
@@ -53,7 +55,7 @@ GET /api/integrations/orders/deliveries
 
 After an order is stored, Camel serializes the canonical model to JSON and sends an HTTP POST to the configured downstream API. Successful deliveries are recorded with status `DELIVERED`.
 
-The downstream URL defaults to `http://localhost:8090/api/orders` and can be overridden with `DELIVERY_URL`.
+The downstream URL defaults to the included local demo endpoint and can be overridden with `DELIVERY_URL` for a real external service.
 
 ## Retry And Dead Letters
 
@@ -161,4 +163,3 @@ Camel Micrometer instrumentation records route and exchange metrics. The custom 
 ## Planned Showcase Flows
 
 - JSON and XML transformation
-- Browser demo

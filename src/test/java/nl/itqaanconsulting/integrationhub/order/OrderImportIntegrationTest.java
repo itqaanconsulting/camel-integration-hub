@@ -166,6 +166,12 @@ class OrderImportIntegrationTest {
     }
 
     @Test
+    void servesBrowserDemo() throws Exception {
+        mockMvc.perform(get("/"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void rejectsInvalidOrderBeforeEnteringRoute() throws Exception {
         mockMvc.perform(post("/api/integrations/orders")
                         .contentType(MediaType.APPLICATION_JSON)
