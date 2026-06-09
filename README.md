@@ -2,20 +2,39 @@
 
 Integration showcase built with Java 21, Spring Boot and Apache Camel.
 
-The hub accepts individual JSON orders and CSV batches, and can poll CSV files from SFTP. Every input is normalized to one canonical model and uses a Camel content-based router to assign a standard or high-value processing lane.
+The hub accepts JSON orders, CSV batches and SFTP files. Every input is normalized to one canonical model, routed through Apache Camel and delivered to an HTTP API with retry and dead-letter handling.
 
-## Current Flow
+![Camel Integration Hub dashboard](docs/dashboard.png)
 
-```text
-REST request
-    -> validation
-    -> Camel direct endpoint
-    -> canonical model mapping
-    -> content-based routing
-    -> in-memory order store
-    -> JSON serialization
-    -> external HTTP API
-    -> delivery or dead-letter registration
+## Highlights
+
+- REST, CSV and SFTP input channels
+- Canonical data model and content-based routing
+- External HTTP delivery with JSON serialization
+- Exponential retry and dead-letter handling
+- WireMock integration tests
+- Micrometer, Actuator and Prometheus metrics
+- Interactive browser demo
+- GitHub Actions build on Java 21
+
+## Architecture
+
+```mermaid
+flowchart LR
+    REST["REST JSON"] --> NORMALIZE["Validation and normalization"]
+    CSV["REST CSV"] --> PARSE["CSV unmarshalling"]
+    SFTP["SFTP CSV"] --> PARSE
+    PARSE --> NORMALIZE
+    NORMALIZE --> ROUTER{"Amount >= 1000?"}
+    ROUTER -->|No| STANDARD["Standard lane"]
+    ROUTER -->|Yes| HIGH["High-value lane"]
+    STANDARD --> STORE["Canonical order store"]
+    HIGH --> STORE
+    STORE --> HTTP["HTTP JSON delivery"]
+    HTTP -->|2xx| DELIVERED["Delivered"]
+    HTTP -->|Error, 3 attempts| DLQ["Dead letter"]
+    DELIVERED --> METRICS["Micrometer and Prometheus"]
+    DLQ --> METRICS
 ```
 
 CSV batches use Camel CSV unmarshalling. Each valid row enters the same canonical order route as a JSON request, while invalid rows are returned in a reject report.
@@ -29,6 +48,13 @@ mvn spring-boot:run
 The application runs on `http://localhost:8083`.
 
 Open `http://localhost:8083` for the browser demo. It can submit successful orders, trigger the retry/dead-letter scenario and inspect route and delivery status without additional infrastructure.
+
+## Demo
+
+1. Submit the prefilled order and inspect the `DELIVERED` result.
+2. Select **Run failure scenario**.
+3. Observe three delivery attempts and the `DEAD LETTER` result.
+4. Inspect the route statuses and open the Prometheus metrics link.
 
 Import an order:
 
@@ -160,6 +186,6 @@ GET /actuator/prometheus
 
 Camel Micrometer instrumentation records route and exchange metrics. The custom `integration.orders.delivery` counter uses a `status` tag to distinguish delivered orders from dead letters. The Prometheus endpoint can be scraped by a monitoring platform such as Prometheus or Grafana.
 
-## Planned Showcase Flows
+## Technology
 
-- JSON and XML transformation
+Java 21, Spring Boot 3.5, Apache Camel 4.14 LTS, WireMock, Micrometer, Prometheus, Maven and Docker Compose.
