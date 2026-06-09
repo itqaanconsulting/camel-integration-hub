@@ -139,7 +139,26 @@ mvn test
 
 WireMock starts on a random port during the integration test. The tests verify the JSON request body, successful delivery and all three HTTP attempts for a failed delivery.
 
+## Observability
+
+The application exposes an integration overview with current business totals and Camel route statuses:
+
+```http
+GET /api/integrations/overview
+```
+
+Technical health and metrics are available through Spring Boot Actuator:
+
+```http
+GET /actuator/health
+GET /actuator/metrics
+GET /actuator/metrics/integration.orders.delivery
+GET /actuator/prometheus
+```
+
+Camel Micrometer instrumentation records route and exchange metrics. The custom `integration.orders.delivery` counter uses a `status` tag to distinguish delivered orders from dead letters. The Prometheus endpoint can be scraped by a monitoring platform such as Prometheus or Grafana.
+
 ## Planned Showcase Flows
 
 - JSON and XML transformation
-- Route metrics and browser demo
+- Browser demo

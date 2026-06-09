@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 @Repository
 public class InMemoryOrderDeliveryStore {
@@ -28,6 +29,11 @@ public class InMemoryOrderDeliveryStore {
         return findAll().stream()
                 .filter(delivery -> "DEAD_LETTER".equals(delivery.status()))
                 .toList();
+    }
+
+    public Map<String, Long> countByStatus() {
+        return deliveries.values().stream()
+                .collect(Collectors.groupingBy(OrderDelivery::status, Collectors.counting()));
     }
 
     public void clear() {

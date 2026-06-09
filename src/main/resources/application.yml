@@ -9,12 +9,19 @@ camel:
   dataformat:
     jackson:
       auto-discover-object-mapper: true
+  metrics:
+    enable-route-policy: true
+    enable-route-event-notifier: true
+    enable-exchange-event-notifier: true
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
 
 info:
   app:

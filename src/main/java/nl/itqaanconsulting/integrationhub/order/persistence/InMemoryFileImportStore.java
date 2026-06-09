@@ -22,6 +22,10 @@ public class InMemoryFileImportStore {
                 .toList();
     }
 
+    public int size() {
+        return imports.size();
+    }
+
     public void clear() {
         imports.clear();
     }

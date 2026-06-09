@@ -1,5 +1,6 @@
 package nl.itqaanconsulting.integrationhub.order.application;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import nl.itqaanconsulting.integrationhub.order.domain.CanonicalOrder;
 import nl.itqaanconsulting.integrationhub.order.domain.OrderDelivery;
 import nl.itqaanconsulting.integrationhub.order.persistence.InMemoryOrderDeliveryStore;
@@ -14,9 +15,11 @@ public class OrderDeliveryRecorder {
     public static final String DELIVERY_ATTEMPTS_PROPERTY = "deliveryAttempts";
 
     private final InMemoryOrderDeliveryStore deliveryStore;
+    private final MeterRegistry meterRegistry;
 
-    public OrderDeliveryRecorder(InMemoryOrderDeliveryStore deliveryStore) {
+    public OrderDeliveryRecorder(InMemoryOrderDeliveryStore deliveryStore, MeterRegistry meterRegistry) {
         this.deliveryStore = deliveryStore;
+        this.meterRegistry = meterRegistry;
     }
 
     public void recordDelivered(Exchange exchange) {
@@ -40,5 +43,6 @@ public class OrderDeliveryRecorder {
                 errorMessage,
                 Instant.now()
         ));
+        meterRegistry.counter("integration.orders.delivery", "status", status).increment();
     }
 }

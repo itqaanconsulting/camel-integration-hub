@@ -148,6 +148,24 @@ class OrderImportIntegrationTest {
     }
 
     @Test
+    void exposesIntegrationOverviewAndMetrics() throws Exception {
+        mockMvc.perform(post("/api/integrations/orders")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(orderJson("ERP", "monitoring@example.com", "125.00", "EUR")))
+                .andExpect(status().isAccepted());
+
+        mockMvc.perform(get("/api/integrations/overview"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalOrders").value(1))
+                .andExpect(jsonPath("$.deliveriesByStatus.DELIVERED").value(1))
+                .andExpect(jsonPath("$.routes[?(@.routeId == 'deliver-order-route')].status").value("Started"));
+
+        mockMvc.perform(get("/actuator/metrics/integration.orders.delivery"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("integration.orders.delivery"));
+    }
+
+    @Test
     void rejectsInvalidOrderBeforeEnteringRoute() throws Exception {
         mockMvc.perform(post("/api/integrations/orders")
                         .contentType(MediaType.APPLICATION_JSON)
