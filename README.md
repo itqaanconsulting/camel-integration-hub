@@ -12,6 +12,7 @@ The hub accepts JSON orders, CSV batches and SFTP files. Every input is normaliz
 - Canonical data model and content-based routing
 - External HTTP delivery with JSON serialization
 - Exponential retry and dead-letter handling
+- Persistent delivery history and dead-letter reprocessing
 - WireMock integration tests
 - Micrometer, Actuator and Prometheus metrics
 - Interactive browser demo
@@ -54,7 +55,8 @@ Open `http://localhost:8083` for the browser demo. It can submit successful orde
 1. Submit the prefilled order and inspect the `DELIVERED` result.
 2. Select **Run failure scenario**.
 3. Observe three delivery attempts and the `DEAD LETTER` result.
-4. Inspect the route statuses and open the Prometheus metrics link.
+4. Click **Reprocess** after the simulated downstream recovery and observe `DELIVERED`.
+5. Inspect the route statuses and open the Prometheus metrics link.
 
 Import an order:
 
@@ -108,7 +110,13 @@ Inspect the delivery result:
 GET /api/integrations/orders/dead-letters
 ```
 
-The response shows status `DEAD_LETTER`, three attempts and the final HTTP error. Retry settings can be overridden with `DELIVERY_MAXIMUM_REDELIVERIES` and `DELIVERY_REDELIVERY_DELAY`.
+The response shows status `DEAD_LETTER`, three attempts and the final HTTP error. Delivery records are stored in a file-backed H2 database and survive application restarts. Retry settings can be overridden with `DELIVERY_MAXIMUM_REDELIVERIES` and `DELIVERY_REDELIVERY_DELAY`.
+
+Reprocess a dead letter after the downstream system has recovered:
+
+```http
+POST /api/integrations/orders/dead-letters/{integrationId}/reprocess
+```
 
 Import a CSV batch:
 

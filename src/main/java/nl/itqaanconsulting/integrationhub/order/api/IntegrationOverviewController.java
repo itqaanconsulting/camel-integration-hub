@@ -1,7 +1,7 @@
 package nl.itqaanconsulting.integrationhub.order.api;
 
 import nl.itqaanconsulting.integrationhub.order.persistence.InMemoryFileImportStore;
-import nl.itqaanconsulting.integrationhub.order.persistence.InMemoryOrderDeliveryStore;
+import nl.itqaanconsulting.integrationhub.order.persistence.OrderDeliveryStore;
 import nl.itqaanconsulting.integrationhub.order.persistence.InMemoryOrderStore;
 import org.apache.camel.CamelContext;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -14,13 +14,13 @@ public class IntegrationOverviewController {
 
     private final CamelContext camelContext;
     private final InMemoryOrderStore orderStore;
-    private final InMemoryOrderDeliveryStore deliveryStore;
+    private final OrderDeliveryStore deliveryStore;
     private final InMemoryFileImportStore fileImportStore;
 
     public IntegrationOverviewController(
             CamelContext camelContext,
             InMemoryOrderStore orderStore,
-            InMemoryOrderDeliveryStore deliveryStore,
+            OrderDeliveryStore deliveryStore,
             InMemoryFileImportStore fileImportStore
     ) {
         this.camelContext = camelContext;

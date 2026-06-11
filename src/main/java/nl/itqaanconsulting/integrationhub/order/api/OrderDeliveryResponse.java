@@ -15,12 +15,12 @@ public record OrderDeliveryResponse(
 ) {
     public static OrderDeliveryResponse from(OrderDelivery delivery) {
         return new OrderDeliveryResponse(
-                delivery.integrationId(),
-                delivery.externalOrderId(),
-                delivery.status(),
-                delivery.attempts(),
-                delivery.errorMessage(),
-                delivery.updatedAt()
+                delivery.getIntegrationId(),
+                delivery.getExternalOrderId(),
+                delivery.getStatus(),
+                delivery.getAttempts(),
+                delivery.getErrorMessage(),
+                delivery.getUpdatedAt()
         );
     }
 }

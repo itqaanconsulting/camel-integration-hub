@@ -4,7 +4,7 @@ import jakarta.validation.Valid;
 import nl.itqaanconsulting.integrationhub.order.domain.CanonicalOrder;
 import nl.itqaanconsulting.integrationhub.order.persistence.InMemoryOrderStore;
 import nl.itqaanconsulting.integrationhub.order.persistence.InMemoryFileImportStore;
-import nl.itqaanconsulting.integrationhub.order.persistence.InMemoryOrderDeliveryStore;
+import nl.itqaanconsulting.integrationhub.order.persistence.OrderDeliveryStore;
 import org.apache.camel.ProducerTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -15,6 +15,9 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.UUID;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequestMapping("/api/integrations/orders")
@@ -23,13 +26,13 @@ public class OrderImportController {
     private final ProducerTemplate producerTemplate;
     private final InMemoryOrderStore orderStore;
     private final InMemoryFileImportStore fileImportStore;
-    private final InMemoryOrderDeliveryStore deliveryStore;
+    private final OrderDeliveryStore deliveryStore;
 
     public OrderImportController(
             ProducerTemplate producerTemplate,
             InMemoryOrderStore orderStore,
             InMemoryFileImportStore fileImportStore,
-            InMemoryOrderDeliveryStore deliveryStore
+            OrderDeliveryStore deliveryStore
     ) {
         this.producerTemplate = producerTemplate;
         this.orderStore = orderStore;
@@ -81,5 +84,22 @@ public class OrderImportController {
         return deliveryStore.findDeadLetters().stream()
                 .map(OrderDeliveryResponse::from)
                 .toList();
+    }
+
+    @PostMapping("/dead-letters/{integrationId}/reprocess")
+    public OrderDeliveryResponse reprocess(@PathVariable UUID integrationId) {
+        var delivery = deliveryStore.findById(integrationId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Delivery not found: " + integrationId
+                ));
+        if (!"DEAD_LETTER".equals(delivery.getStatus())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Only dead letters can be reprocessed");
+        }
+
+        producerTemplate.requestBody("direct:deliver-order", delivery.toCanonicalOrder());
+        return deliveryStore.findById(integrationId)
+                .map(OrderDeliveryResponse::from)
+                .orElseThrow();
     }
 }

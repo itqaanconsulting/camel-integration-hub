@@ -3,21 +3,19 @@ package nl.itqaanconsulting.integrationhub.order.application;
 import io.micrometer.core.instrument.MeterRegistry;
 import nl.itqaanconsulting.integrationhub.order.domain.CanonicalOrder;
 import nl.itqaanconsulting.integrationhub.order.domain.OrderDelivery;
-import nl.itqaanconsulting.integrationhub.order.persistence.InMemoryOrderDeliveryStore;
+import nl.itqaanconsulting.integrationhub.order.persistence.OrderDeliveryStore;
 import org.apache.camel.Exchange;
 import org.springframework.stereotype.Component;
-
-import java.time.Instant;
 
 @Component
 public class OrderDeliveryRecorder {
 
     public static final String DELIVERY_ATTEMPTS_PROPERTY = "deliveryAttempts";
 
-    private final InMemoryOrderDeliveryStore deliveryStore;
+    private final OrderDeliveryStore deliveryStore;
     private final MeterRegistry meterRegistry;
 
-    public OrderDeliveryRecorder(InMemoryOrderDeliveryStore deliveryStore, MeterRegistry meterRegistry) {
+    public OrderDeliveryRecorder(OrderDeliveryStore deliveryStore, MeterRegistry meterRegistry) {
         this.deliveryStore = deliveryStore;
         this.meterRegistry = meterRegistry;
     }
@@ -36,12 +34,10 @@ public class OrderDeliveryRecorder {
         Integer attempts = exchange.getProperty(DELIVERY_ATTEMPTS_PROPERTY, Integer.class);
 
         deliveryStore.save(new OrderDelivery(
-                order.integrationId(),
-                order.externalOrderId(),
+                order,
                 status,
                 attempts == null ? 1 : attempts,
-                errorMessage,
-                Instant.now()
+                errorMessage
         ));
         meterRegistry.counter("integration.orders.delivery", "status", status).increment();
     }

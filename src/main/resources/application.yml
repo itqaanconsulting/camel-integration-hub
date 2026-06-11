@@ -4,6 +4,16 @@ server:
 spring:
   application:
     name: camel-integration-hub
+  datasource:
+    url: ${DB_URL:jdbc:h2:file:./data/integration-hub;AUTO_SERVER=TRUE}
+    username: ${DB_USERNAME:sa}
+    password: ${DB_PASSWORD:}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
 
 camel:
   dataformat:

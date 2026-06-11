@@ -3,7 +3,7 @@ package nl.itqaanconsulting.integrationhub.order;
 import com.github.tomakehurst.wiremock.WireMockServer;
 import nl.itqaanconsulting.integrationhub.order.persistence.InMemoryOrderStore;
 import nl.itqaanconsulting.integrationhub.order.persistence.InMemoryFileImportStore;
-import nl.itqaanconsulting.integrationhub.order.persistence.InMemoryOrderDeliveryStore;
+import nl.itqaanconsulting.integrationhub.order.persistence.OrderDeliveryStore;
 import org.apache.camel.Exchange;
 import org.apache.camel.CamelContext;
 import org.apache.camel.ProducerTemplate;
@@ -17,6 +17,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.ActiveProfiles;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
@@ -29,6 +30,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest
 @AutoConfigureMockMvc
+@ActiveProfiles("test")
 class OrderImportIntegrationTest {
 
     private static final WireMockServer DOWNSTREAM_API = new WireMockServer(wireMockConfig().dynamicPort());
@@ -58,7 +60,7 @@ class OrderImportIntegrationTest {
     private InMemoryFileImportStore fileImportStore;
 
     @Autowired
-    private InMemoryOrderDeliveryStore deliveryStore;
+    private OrderDeliveryStore deliveryStore;
 
     @BeforeEach
     void clearStore() {
@@ -131,6 +133,27 @@ class OrderImportIntegrationTest {
 
         DOWNSTREAM_API.verify(3, postRequestedFor(urlEqualTo("/api/orders"))
                 .withRequestBody(matchingJsonPath("$.sourceSystem", equalTo("DEMO-UNAVAILABLE"))));
+    }
+
+    @Test
+    void reprocessesPersistedDeadLetterWhenDownstreamRecovers() throws Exception {
+        mockMvc.perform(post("/api/integrations/orders")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(orderJson("demo-unavailable", "recovery@example.com", "249.00", "EUR")))
+                .andExpect(status().isAccepted());
+
+        var deadLetter = deliveryStore.findDeadLetters().getFirst();
+        DOWNSTREAM_API.resetAll();
+        DOWNSTREAM_API.stubFor(com.github.tomakehurst.wiremock.client.WireMock.post(urlEqualTo("/api/orders"))
+                .willReturn(aResponse().withStatus(202)));
+
+        mockMvc.perform(post(
+                        "/api/integrations/orders/dead-letters/{integrationId}/reprocess",
+                        deadLetter.getIntegrationId()
+                ))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("DELIVERED"))
+                .andExpect(jsonPath("$.errorMessage").doesNotExist());
     }
 
     @Test

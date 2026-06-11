@@ -64,7 +64,7 @@ async function refreshDashboard() {
         .join("");
 
     elements.deliveryRows.innerHTML = deliveries.length === 0
-        ? '<tr><td colspan="5" class="empty">No deliveries yet</td></tr>'
+        ? '<tr><td colspan="6" class="empty">No deliveries yet</td></tr>'
         : deliveries.map(delivery => `
             <tr>
                 <td><code>${escapeHtml(delivery.externalOrderId)}</code></td>
@@ -72,6 +72,9 @@ async function refreshDashboard() {
                 <td>${delivery.attempts}</td>
                 <td>${new Date(delivery.updatedAt).toLocaleTimeString()}</td>
                 <td class="result">${escapeHtml(delivery.errorMessage || "Accepted by downstream API")}</td>
+                <td>${delivery.status === "DEAD_LETTER"
+                    ? `<button class="secondary-button reprocess-button" data-integration-id="${delivery.integrationId}">Reprocess</button>`
+                    : ""}</td>
             </tr>
         `).join("");
 }
@@ -130,6 +133,29 @@ elements.failure.addEventListener("click", () => {
 
 elements.refresh.addEventListener("click", () => {
     refreshDashboard().catch(error => showMessage(`Refresh failed: ${error.message}`, "failure"));
+});
+
+elements.deliveryRows.addEventListener("click", async event => {
+    const button = event.target.closest(".reprocess-button");
+    if (!button) {
+        return;
+    }
+
+    button.disabled = true;
+    try {
+        const delivery = await request(
+            `/api/integrations/orders/dead-letters/${button.dataset.integrationId}/reprocess`,
+            {method: "POST"}
+        );
+        showMessage(
+            `Order ${delivery.externalOrderId} was delivered after downstream recovery.`,
+            "success"
+        );
+        await refreshDashboard();
+    } catch (error) {
+        showMessage(`Reprocessing failed: ${error.message}`, "failure");
+        button.disabled = false;
+    }
 });
 
 setInitialOrderId();
