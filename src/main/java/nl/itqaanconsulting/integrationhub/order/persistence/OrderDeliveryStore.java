@@ -34,6 +34,10 @@ public class OrderDeliveryStore {
         return repository.findById(integrationId);
     }
 
+    public Optional<OrderDelivery> findBySourceSystemAndExternalOrderId(String sourceSystem, String externalOrderId) {
+        return repository.findBySourceSystemAndExternalOrderId(sourceSystem, externalOrderId);
+    }
+
     public Map<String, Long> countByStatus() {
         return repository.findAll().stream()
                 .collect(Collectors.groupingBy(OrderDelivery::getStatus, Collectors.counting()));

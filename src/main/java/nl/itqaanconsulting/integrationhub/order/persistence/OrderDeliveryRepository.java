@@ -4,6 +4,7 @@ import nl.itqaanconsulting.integrationhub.order.domain.OrderDelivery;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 interface OrderDeliveryRepository extends JpaRepository<OrderDelivery, UUID> {
@@ -11,4 +12,6 @@ interface OrderDeliveryRepository extends JpaRepository<OrderDelivery, UUID> {
     List<OrderDelivery> findAllByOrderByUpdatedAtDesc();
 
     List<OrderDelivery> findAllByStatusOrderByUpdatedAtDesc(String status);
+
+    Optional<OrderDelivery> findBySourceSystemAndExternalOrderId(String sourceSystem, String externalOrderId);
 }

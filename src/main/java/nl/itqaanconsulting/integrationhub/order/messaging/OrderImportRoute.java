@@ -3,6 +3,7 @@ package nl.itqaanconsulting.integrationhub.order.messaging;
 import nl.itqaanconsulting.integrationhub.order.application.OrderDeliveryRecorder;
 import nl.itqaanconsulting.integrationhub.order.domain.CanonicalOrder;
 import nl.itqaanconsulting.integrationhub.order.persistence.InMemoryOrderStore;
+import nl.itqaanconsulting.integrationhub.order.persistence.OrderDeliveryStore;
 import org.apache.camel.Exchange;
 import org.apache.camel.builder.RouteBuilder;
 import org.apache.camel.dataformat.csv.CsvDataFormat;
@@ -10,21 +11,28 @@ import org.apache.camel.http.base.HttpOperationFailedException;
 import org.apache.camel.model.dataformat.JsonLibrary;
 import org.springframework.stereotype.Component;
 
+import java.io.IOException;
+
 @Component
 public class OrderImportRoute extends RouteBuilder {
 
     private static final String HIGH_VALUE_LANE = "HIGH_VALUE";
     private static final String STANDARD_LANE = "STANDARD";
+    static final String DUPLICATE_ORDER_PROPERTY = "duplicateOrder";
 
     private final InMemoryOrderStore orderStore;
+    private final OrderDeliveryStore deliveryStore;
 
-    public OrderImportRoute(InMemoryOrderStore orderStore) {
+    public OrderImportRoute(InMemoryOrderStore orderStore, OrderDeliveryStore deliveryStore) {
         this.orderStore = orderStore;
+        this.deliveryStore = deliveryStore;
     }
 
     @Override
     public void configure() {
-        onException(HttpOperationFailedException.class)
+        // HTTP error responses and transport failures (connection refused, reset, timeout)
+        // are both transient delivery problems: retry them, then record a dead letter.
+        onException(HttpOperationFailedException.class, IOException.class)
                 .maximumRedeliveries("{{integration.delivery.maximum-redeliveries}}")
                 .redeliveryDelay("{{integration.delivery.redelivery-delay}}")
                 .useExponentialBackOff()
@@ -83,10 +91,27 @@ public class OrderImportRoute extends RouteBuilder {
                 .autoStartup("{{integration.sftp.enabled}}")
                 .to("direct:import-order-file");
 
+        // Idempotent receiver: an order is identified by source system and external order id.
+        // A resubmitted order returns the original result instead of being delivered twice.
         from("direct:store-order")
                 .routeId("store-canonical-order")
-                .process(exchange -> orderStore.save(exchange.getMessage().getBody(CanonicalOrder.class)))
-                .to("direct:deliver-order");
+                .process(exchange -> {
+                    CanonicalOrder order = exchange.getMessage().getBody(CanonicalOrder.class);
+                    deliveryStore.findBySourceSystemAndExternalOrderId(order.sourceSystem(), order.externalOrderId())
+                            .ifPresentOrElse(
+                                    existing -> {
+                                        exchange.setProperty(DUPLICATE_ORDER_PROPERTY, true);
+                                        exchange.getMessage().setBody(existing.toCanonicalOrder());
+                                    },
+                                    () -> orderStore.save(order)
+                            );
+                })
+                .choice()
+                    .when(exchangeProperty(DUPLICATE_ORDER_PROPERTY).isEqualTo(true))
+                        .log("Duplicate order ${body.sourceSystem}:${body.externalOrderId} ignored")
+                    .otherwise()
+                        .to("direct:deliver-order")
+                .end();
 
         from("direct:deliver-order")
                 .routeId("deliver-order-route")

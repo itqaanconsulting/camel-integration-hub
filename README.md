@@ -11,7 +11,8 @@ The hub accepts JSON orders, CSV batches and SFTP files. Every input is normaliz
 - REST, CSV and SFTP input channels
 - Canonical data model and content-based routing
 - External HTTP delivery with JSON serialization
-- Exponential retry and dead-letter handling
+- Idempotent receiver: duplicate orders per source system are never delivered twice
+- Exponential retry and dead-letter handling for HTTP errors and transport failures
 - Persistent delivery history and dead-letter reprocessing
 - WireMock integration tests
 - Micrometer, Actuator and Prometheus metrics
@@ -85,9 +86,13 @@ After an order is stored, Camel serializes the canonical model to JSON and sends
 
 The downstream URL defaults to the included local demo endpoint and can be overridden with `DELIVERY_URL` for a real external service.
 
+## Idempotent Intake
+
+An order is identified by its source system and external order ID. When the same order is submitted again, for example because a client retried after a timeout, the hub returns the original integration ID and delivery result instead of delivering the order a second time. A unique database index enforces this rule.
+
 ## Retry And Dead Letters
 
-The delivery route uses exponential backoff. An HTTP error response is retried twice, resulting in three delivery attempts. When all attempts fail, the order remains accepted and is recorded with status `DEAD_LETTER`.
+The delivery route uses exponential backoff. Both HTTP error responses and transport failures (connection refused, connection reset, timeouts) are retried twice, resulting in three delivery attempts. When all attempts fail, the order remains accepted and is recorded with status `DEAD_LETTER`.
 
 The integration tests use WireMock as the downstream API. Requests for source system `DEMO-UNAVAILABLE` receive HTTP 500, while other requests receive HTTP 202:
 
