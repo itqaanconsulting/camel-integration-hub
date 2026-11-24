@@ -1,6 +1,7 @@
 package nl.itqaanconsulting.integrationhub.order;
 
 import com.github.tomakehurst.wiremock.WireMockServer;
+import com.github.tomakehurst.wiremock.http.Fault;
 import nl.itqaanconsulting.integrationhub.order.persistence.InMemoryOrderStore;
 import nl.itqaanconsulting.integrationhub.order.persistence.InMemoryFileImportStore;
 import nl.itqaanconsulting.integrationhub.order.persistence.OrderDeliveryStore;
@@ -75,6 +76,10 @@ class OrderImportIntegrationTest {
                         .withStatus(500)
                         .withHeader("Content-Type", "application/json")
                         .withBody("{\"message\":\"Downstream service is unavailable\"}")));
+        DOWNSTREAM_API.stubFor(com.github.tomakehurst.wiremock.client.WireMock.post(urlEqualTo("/api/orders"))
+                .atPriority(1)
+                .withRequestBody(matchingJsonPath("$.sourceSystem", equalTo("DEMO-UNREACHABLE")))
+                .willReturn(aResponse().withFault(Fault.EMPTY_RESPONSE)));
         orderStore.clear();
         fileImportStore.clear();
         deliveryStore.clear();
@@ -133,6 +138,44 @@ class OrderImportIntegrationTest {
 
         DOWNSTREAM_API.verify(3, postRequestedFor(urlEqualTo("/api/orders"))
                 .withRequestBody(matchingJsonPath("$.sourceSystem", equalTo("DEMO-UNAVAILABLE"))));
+    }
+
+    @Test
+    void retriesTransportFailureAndMovesItToDeadLetterStore() throws Exception {
+        mockMvc.perform(post("/api/integrations/orders")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(orderJson("demo-unreachable", "network@example.com", "99.00", "EUR")))
+                .andExpect(status().isAccepted());
+
+        mockMvc.perform(get("/api/integrations/orders/dead-letters"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].externalOrderId").value("EXT-1001"))
+                .andExpect(jsonPath("$[0].status").value("DEAD_LETTER"))
+                .andExpect(jsonPath("$[0].attempts").value(3));
+
+        DOWNSTREAM_API.verify(moreThanOrExactly(3), postRequestedFor(urlEqualTo("/api/orders"))
+                .withRequestBody(matchingJsonPath("$.sourceSystem", equalTo("DEMO-UNREACHABLE"))));
+    }
+
+    @Test
+    void ignoresDuplicateOrderFromSameSourceSystem() throws Exception {
+        String firstIntegrationId = com.jayway.jsonpath.JsonPath.read(
+                mockMvc.perform(post("/api/integrations/orders")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(orderJson("web-shop", "customer@example.com", "149.95", "EUR")))
+                        .andExpect(status().isAccepted())
+                        .andReturn().getResponse().getContentAsString(),
+                "$.integrationId"
+        );
+
+        mockMvc.perform(post("/api/integrations/orders")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(orderJson("web-shop", "customer@example.com", "149.95", "EUR")))
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.integrationId").value(firstIntegrationId));
+
+        assertThat(deliveryStore.findAll()).hasSize(1);
+        DOWNSTREAM_API.verify(1, postRequestedFor(urlEqualTo("/api/orders")));
     }
 
     @Test
