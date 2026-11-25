@@ -201,4 +201,4 @@ Camel Micrometer instrumentation records route and exchange metrics. The custom 
 
 ## Technology
 
-Java 21, Spring Boot 3.5, Apache Camel 4.14 LTS, WireMock, Micrometer, Prometheus, Maven and Docker Compose.
+Java 21, Spring Boot 4.1, Apache Camel 4.22, Jackson 3, WireMock, Micrometer, Prometheus, Maven and Docker Compose.
