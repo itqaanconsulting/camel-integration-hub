@@ -18,6 +18,12 @@
     <description>Apache Camel integration patterns showcase</description>
 
     <properties>
+
+        <!-- Tomcat 11.0.29 fixes CVE-2026-116561 and CVE-2026-118028 (critical) and several high ones;
+
+             remove this override once Spring Boot manages 11.0.29 or later. -->
+
+        <tomcat.version>11.0.29</tomcat.version>
         <java.version>21</java.version>
         <camel.version>4.22.2</camel.version>
     </properties>
